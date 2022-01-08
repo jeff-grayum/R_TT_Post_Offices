@@ -74,10 +74,12 @@ post_office_years <- post_offices %>%
 
 
 ```{r}
-  post_office_years %>%
+ post_offices_cumulative <-  post_office_years %>%
   count(year,
         state = fct_lump(state, 16),
-        name = "n_post_offices") %>%
+        name = "n_post_offices") 
+
+post_offices_cumulative %>%
   filter(state != "Other") %>%
   mutate(state = fct_reorder(state, -n_post_offices, sum)) %>%
   ggplot(aes(year, n_post_offices, fill = state)) +
@@ -91,8 +93,61 @@ post_office_years <- post_offices %>%
   facet_wrap(~ state)
 ```
 
+Let's look at closures per decade.
+```{r}
+post_offices %>%
+  filter(!is.na(discontinued)) %>%
+  count(state,
+           decade = 10 * (discontinued %/% 10),
+        name = "n_closures") %>%
+  filter(state == "KY") %>%
+  ggplot(aes(decade, n_closures)) +
+  geom_area() +
+  labs(x = "Decade",
+       y = "# of PO closures",
+       title = "Number of post offices closed per decade:",
+       subtitle = "Kentucky") +
+  theme_hc()
+
+post_office_closures <- post_offices %>%
+  filter(!is.na(discontinued),
+         established >= 1750,
+         discontinued >= 1750,
+         discontinued <= 2021) %>%
+  count(state = fct_lump(state, 16),
+        decade = 10 * (discontinued %/% 10),
+        name = "n_closures") 
+
+post_office_closures %>%
+  mutate(state = fct_reorder(state, -n_closures, sum)) %>%
+  filter(state != "Other") %>%
+  ggplot(aes(decade, n_closures, fill = state)) +
+  geom_area() +
+  labs(x = "Decade",
+       y = "# of post offices closed in this decade",
+       title = "When and where were the most post offices closed?") +
+  facet_wrap(~ state) +
+  theme_hc() +
+  theme(legend.position = "none") 
+  
+```
 
 
+```{r}
+post_office_closures %>%
+  filter(decade < 2000) %>%
+  inner_join(post_offices_cumulative, by = c("state", "decade" = "year")) %>%
+  mutate(pct_closed = n_closures / n_post_offices) %>%
+  filter(n_post_offices >= 50,
+         state %in% c("KY", "PA")) %>%
+  ggplot(aes(decade, pct_closed, color = state)) +
+  geom_line() +
+  scale_y_continuous(labels = percent) +
+  labs(x = "Decade",
+       y = "% of post offices closed",
+       color = "State") +
+  theme_hc()
+```
 
 
 
