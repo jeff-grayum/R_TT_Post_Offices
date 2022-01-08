@@ -1,0 +1,105 @@
+---
+title: "Post offices"
+author: "Jeff Grayum"
+date: "1/8/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading libraries.
+```{r}
+library(tidyverse)
+library(tidytuesdayR)
+library(scales)
+library(ggthemes)
+```
+
+Loading dataset.
+```{r}
+tuesdata <- tidytuesdayR::tt_load('2021-04-13')
+
+post_offices <- tuesdata$post_offices
+
+post_offices %>%
+  view()
+```
+
+Getting started...
+```{r}
+post_offices %>%
+  count(id, sort = TRUE)
+
+post_offices %>%
+  count(name, sort = TRUE)
+
+post_offices %>%
+  count(name, orig_name, state, sort = TRUE)
+
+post_offices %>%
+  filter(county1 == "GRAND TRAVERSE", name == "ACME") %>%
+  view()
+
+post_offices %>%
+  add_count(name, orig_name, state, county1, sort = TRUE) %>%
+  filter(n >= 2) %>%
+  arrange(name, orig_name, state, county1) %>%
+  view()
+
+post_offices <- tuesdata$post_offices %>%
+  select(name, state, county1, established, discontinued, continuous, stamp_index, id, coordinates, latitude, longitude, gnis_dist, gnis_county, gnis_state) %>%
+  filter(established >= 1750,
+       is.na(discontinued) |  discontinued >= established)
+
+post_office_years <- post_offices %>%
+  select(name, state, established, discontinued) %>%
+  replace_na(list(discontinued = 2003)) %>%
+  filter(discontinued <= 2021) %>%
+  mutate(year = map2(established, discontinued, seq)) %>%
+  unnest(year)
+  
+  post_office_years %>%
+  count(year, name = "n_post_offices") %>%
+  ggplot(aes(year, n_post_offices)) +
+  geom_area() +
+    labs(x = "Year",
+         y = "# of post offices",
+         title = "Number of post offices in the US") +
+    theme_hc()
+```
+
+
+```{r}
+  post_office_years %>%
+  count(year,
+        state = fct_lump(state, 16),
+        name = "n_post_offices") %>%
+  filter(state != "Other") %>%
+  mutate(state = fct_reorder(state, -n_post_offices, sum)) %>%
+  ggplot(aes(year, n_post_offices, fill = state)) +
+  geom_area() +
+    labs(x = "Year",
+         y = "# of post offices",
+         title = "Number of post offices in the US",
+         fill = "State") +
+    theme_hc() +
+  theme(legend.position = "none") +
+  facet_wrap(~ state)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
