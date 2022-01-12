@@ -17,6 +17,9 @@ library(tidyverse)
 library(tidytuesdayR)
 library(scales)
 library(ggthemes)
+#install.packages("historydata")
+library(historydata)
+library(gganimate)
 ```
 
 Loading dataset.
@@ -56,7 +59,7 @@ post_offices <- tuesdata$post_offices %>%
        is.na(discontinued) |  discontinued >= established)
 
 post_office_years <- post_offices %>%
-  select(name, state, established, discontinued) %>%
+  select(name, state, established, discontinued, latitude, longitude) %>%
   replace_na(list(discontinued = 2003)) %>%
   filter(discontinued <= 2021) %>%
   mutate(year = map2(established, discontinued, seq)) %>%
@@ -150,8 +153,125 @@ post_office_closures %>%
 ```
 
 
+Let's make some maps.
+```{r}
+post_office_years %>%
+  filter(year == 2003) %>%
+  count(state, sort = TRUE) 
 
+states_map <- map_data("state") %>%
+  as_tibble() %>%
+  mutate(state = state.abb[match(region, str_to_lower(state.name))]) %>%
+  replace_na(list(state = "DC"))
 
+post_office_years %>%
+  filter(year == 2000) %>%
+  count(state, sort = TRUE) %>%
+  inner_join(states_map, by = "state") %>%
+  ggplot(aes(long, lat, group = group, fill = n)) +
+  geom_polygon() + 
+  scale_fill_gradient2(low = "blue", high = "red", midpoint = 750) +
+  theme_map() +
+  labs(fill = "# of post offices in 2003")
+
+state_pop_2000 <- us_state_populations %>%
+  filter(year == 2000) %>%
+  mutate(state = state.abb[match(state, state.name)]) %>%
+  replace_na(list(state = "DC"))
+
+post_office_years %>%
+  filter(year == 2000) %>%
+  count(state, sort = TRUE) %>%
+  inner_join(state_pop %>%
+               filter(year == 2000), by = "state") %>%
+  inner_join(states_map, by = "state") %>%
+  mutate(post_office_density = n / (population / 1e6)) %>%
+  ggplot(aes(long, lat, group = group, fill = post_office_density)) +
+  geom_polygon() + 
+  scale_fill_gradient2(low = "blue", high = "red", midpoint = 250) +
+  theme_map() +
+  labs(fill = "Post offices / million people")
+
+state_pop <- us_state_populations %>%
+  mutate(state = state.abb[match(state, state.name)]) %>%
+  replace_na(list(state = "DC"))
+```
+
+Let's make that map pretty and make it dance.
+```{r}
+ post_offices_cumulative_all <-  post_office_years %>%
+  count(year,
+        state,
+        name = "n_post_offices") 
+
+by_state_year <- post_offices_cumulative_all %>%
+  left_join(state_pop, by = c("year", "state")) %>%
+  mutate(post_office_density = n_post_offices / (population / 1e6)) 
+
+by_state_year %>%
+  filter(year %in% c(1800, 1850, 1900, 1950)) %>%
+  inner_join(states_map, by = "state") %>%
+  ggplot(aes(long, lat, group = group, fill = n_post_offices)) +
+  geom_polygon() + 
+  scale_fill_gradient2(low = "blue", high = "red", mid = "pink", midpoint = 2000) +
+  theme_map() +
+  labs(fill = "Post offices") +
+  facet_wrap(~ year) 
+  
+by_state_year %>%
+  filter(year %% 5 == 0) %>%
+  inner_join(states_map, by = "state") %>%
+  ggplot(aes(long, lat, group = group, fill = n_post_offices)) +
+  geom_polygon() + 
+  scale_fill_gradient2(low = "blue", high = "red", mid = "pink", midpoint = 2000) +
+  transition_manual(year) +
+  theme_map() +
+  labs(fill = "Post offices",
+       title = "Number of post offices in the year {current_frame}") 
+
+```
+
+```{r}
+post_office_years %>%
+  filter(year == 1900,
+         !state %in% c("HI", "AK")) %>%
+  ggplot(aes(longitude, latitude)) +
+  borders("state") +
+  geom_point(size = .02) +
+  theme_map() +
+  coord_map()
+
+ post_office_years %>%
+  filter(year == 2000,
+         !state %in% c("HI", "AK")) %>%
+  ggplot(aes(longitude, latitude)) +
+  borders("state") +
+  geom_point(size = .02) +
+  theme_map() +
+  coord_map()
+ 
+  post_office_years %>%
+  filter(year %% 60 == 0,
+         !state %in% c("HI", "AK")) %>%
+  ggplot(aes(longitude, latitude)) +
+  borders("state") +
+  geom_point(size = .02, alpha = 0.3) +
+  theme_map() +
+  coord_map() +
+  facet_wrap(~ year)
+  
+  
+post_office_years %>%
+  filter(year %% 2 == 0,
+         !state %in% c("HI", "AK")) %>%
+  ggplot(aes(longitude, latitude)) +
+  borders("state") +
+  geom_point(size = .02, alpha = 0.25) +
+  transition_manual(year) +
+  labs(title = "Number of post offices in the year { current_frame}") +
+  theme_map() +
+  coord_map()
+```
 
 
 
